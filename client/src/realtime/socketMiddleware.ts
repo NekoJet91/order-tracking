@@ -4,7 +4,6 @@ import {
   connectionGaveUp,
   connectionLost,
   connectionOpened,
-  frameReceived,
 } from '../features/connection/connectionSlice'
 import { orderPushed, snapshotReceived } from '../features/orders/ordersSlice'
 import { socketConnectRequested, socketDisconnectRequested, socketRetryRequested } from './socketActions'
@@ -63,8 +62,8 @@ export const socketMiddleware: Middleware<object, unknown, Dispatch<UnknownActio
   let wanted = false
 
   function handleFrame(data: string): void {
+    // Any frame, heartbeat included, is proof of life for the watchdog below.
     lastFrameAt = Date.now()
-    api.dispatch(frameReceived(lastFrameAt))
 
     let frame: ServerFrame
 
@@ -88,7 +87,7 @@ export const socketMiddleware: Middleware<object, unknown, Dispatch<UnknownActio
         // Counted above and otherwise ignored: proof of life is the whole payload.
         break
       default:
-        // A frame type added by a newer server. 
+        // A frame type added by a newer server.
         break
     }
   }
@@ -147,7 +146,7 @@ export const socketMiddleware: Middleware<object, unknown, Dispatch<UnknownActio
     next.onopen = () => {
       attempts = 0
       lastFrameAt = Date.now()
-      api.dispatch(connectionOpened(lastFrameAt))
+      api.dispatch(connectionOpened())
     }
 
     next.onmessage = (event) => {
@@ -176,13 +175,16 @@ export const socketMiddleware: Middleware<object, unknown, Dispatch<UnknownActio
     window.addEventListener('online', onOnline)
   }
 
-  function stop(): void {
-    wanted = false
-
+  function cancelReconnect(): void {
     if (reconnectTimer !== null) {
       clearTimeout(reconnectTimer)
       reconnectTimer = null
     }
+  }
+
+  function stop(): void {
+    wanted = false
+    cancelReconnect()
 
     if (watchdog !== null) {
       clearInterval(watchdog)
@@ -207,11 +209,7 @@ export const socketMiddleware: Middleware<object, unknown, Dispatch<UnknownActio
       return
     }
 
-    if (reconnectTimer !== null) {
-      clearTimeout(reconnectTimer)
-      reconnectTimer = null
-    }
-
+    cancelReconnect()
     open()
   }
 

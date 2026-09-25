@@ -99,53 +99,23 @@ public sealed partial class OrderEventsConsumer(
 
         try
         {
-            var notification = Parse(delivery);
+            var outcome = await HandleAsync(delivery, activity, stoppingToken).ConfigureAwait(false);
 
-            if (notification is null)
+            OrderTrackingDiagnostics.MessageHandled(Name(outcome));
+
+            if (outcome is Outcome.Unreadable)
             {
                 // Unparseable and will stay unparseable however many times it is retried, so
                 // it goes straight to the dead-letter queue instead of round-tripping forever.
                 LogUnreadable(logger, delivery.RoutingKey);
-                OrderTrackingDiagnostics.MessageHandled("unreadable");
                 activity?.SetStatus(ActivityStatusCode.Error, "Message could not be read.");
                 await channel.BasicNackAsync(delivery.DeliveryTag, multiple: false, requeue: false,
                     stoppingToken).ConfigureAwait(false);
                 return;
             }
 
-            // A scope per message: the handler and the DbContext are scoped, and reusing one
-            // across messages would leak tracked entities from every message before it.
-            await using var scope = scopeFactory.CreateAsyncScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<OrderTrackingDbContext>();
-
-            activity?.SetTag("messaging.message.id", notification.EventId);
-            activity?.SetTag("ordertracking.order_number", notification.OrderNumber);
-
-            if (await AlreadyHandledAsync(dbContext, notification.EventId, stoppingToken)
-                    .ConfigureAwait(false))
-            {
-                LogDuplicate(logger, notification.EventId);
-                OrderTrackingDiagnostics.MessageHandled("duplicate");
-                await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, stoppingToken)
-                    .ConfigureAwait(false);
-                return;
-            }
-
-            var handler = scope.ServiceProvider.GetRequiredService<IOrderEventHandler>();
-            await handler.HandleAsync(notification, stoppingToken).ConfigureAwait(false);
-
-            dbContext.ProcessedMessages.Add(new ProcessedMessage
-            {
-                MessageId = notification.EventId,
-                ProcessedAt = timeProvider.GetUtcNow()
-            });
-
-            await dbContext.SaveChangesAsync(stoppingToken).ConfigureAwait(false);
-
-            OrderTrackingDiagnostics.MessageHandled("handled");
-
-            // Acknowledged only now. Anything that went wrong above leaves the message
-            // unacknowledged, and the broker redelivers it.
+            // Acknowledged only now, after the handler ran and the marker is committed.
+            // Anything that threw above leaves the message unacknowledged for redelivery.
             await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, stoppingToken)
                 .ConfigureAwait(false);
         }
@@ -158,7 +128,7 @@ public sealed partial class OrderEventsConsumer(
 #pragma warning restore CA1031
         {
             LogHandlingFailed(logger, delivery.RoutingKey, exception);
-            OrderTrackingDiagnostics.MessageHandled("failed");
+            OrderTrackingDiagnostics.MessageHandled(Name(Outcome.Failed));
             activity?.SetStatus(ActivityStatusCode.Error, exception.Message);
 
             // requeue: false sends it to the dead-letter exchange. Requeueing a message that
@@ -168,6 +138,69 @@ public sealed partial class OrderEventsConsumer(
                 CancellationToken.None).ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Everything between receiving a message and deciding what to tell the broker about it.
+    /// </summary>
+    /// <returns>What happened; the caller turns that into an ack or a nack.</returns>
+    private async Task<Outcome> HandleAsync(
+        BasicDeliverEventArgs delivery,
+        Activity? activity,
+        CancellationToken cancellationToken)
+    {
+        var notification = Parse(delivery);
+
+        if (notification is null)
+        {
+            return Outcome.Unreadable;
+        }
+
+        // A scope per message: the handler and the DbContext are scoped, and reusing one
+        // across messages would leak tracked entities from every message before it.
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<OrderTrackingDbContext>();
+
+        activity?.SetTag("messaging.message.id", notification.EventId);
+        activity?.SetTag("ordertracking.order_number", notification.OrderNumber);
+
+        if (await AlreadyHandledAsync(dbContext, notification.EventId, cancellationToken)
+                .ConfigureAwait(false))
+        {
+            LogDuplicate(logger, notification.EventId);
+            return Outcome.Duplicate;
+        }
+
+        var handler = scope.ServiceProvider.GetRequiredService<IOrderEventHandler>();
+        await handler.HandleAsync(notification, cancellationToken).ConfigureAwait(false);
+
+        dbContext.ProcessedMessages.Add(new ProcessedMessage
+        {
+            MessageId = notification.EventId,
+            ProcessedAt = timeProvider.GetUtcNow()
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return Outcome.Handled;
+    }
+
+    /// <summary>How a message left the consumer; also the <c>outcome</c> tag on the metric.</summary>
+    private enum Outcome
+    {
+        Handled,
+        Duplicate,
+        Unreadable,
+        Failed
+    }
+
+    private static string Name(Outcome outcome) => outcome switch
+    {
+        Outcome.Handled => "handled",
+        Outcome.Duplicate => "duplicate",
+        Outcome.Unreadable => "unreadable",
+        Outcome.Failed => "failed",
+        _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null)
+    };
 
     private static ActivityContext ParentOf(BasicDeliverEventArgs delivery)
     {

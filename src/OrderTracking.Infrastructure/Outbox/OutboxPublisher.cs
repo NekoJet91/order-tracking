@@ -79,7 +79,7 @@ public sealed partial class OutboxPublisher(
 
         // FOR UPDATE SKIP LOCKED is what makes more than one instance of the API safe to
         // run. Each sweep claims rows no one else holds and steps over the rest instead of
-        // blocking on them
+        // blocking on them.
         var pending = await dbContext.OutboxMessages
             .FromSql($"""
                 SELECT *

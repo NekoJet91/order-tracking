@@ -94,8 +94,15 @@ internal sealed class DomainEventsToOutboxInterceptor : SaveChangesInterceptor
     /// Counts the business event behind the row.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Here rather than in the endpoints, because this is the one place every change passes
     /// through — the REST API, the status simulator and anything added later included.
+    /// </para>
+    /// <para>
+    /// Counted before the save is known to have succeeded, so a change that then loses a
+    /// concurrency race is still counted. Accepted: these are trend counters, and moving
+    /// them after the commit would mean re-deriving the events from the outbox rows.
+    /// </para>
     /// </remarks>
     private static void Count(IDomainEvent domainEvent)
     {

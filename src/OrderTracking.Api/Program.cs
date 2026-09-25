@@ -30,8 +30,9 @@ builder.Services.AddSingleton(TimeProvider.System);
 // Swashbuckle builds schemas from Mvc.JsonOptions — two unrelated options objects. Set only
 // the first and the API returns "Shipped" while the OpenAPI document promises 2, so every
 // generated client is wrong in the same place.
+//
 // allowIntegerValues: false because the published schema says these are strings. Left at
-// the default, the API would also accept {"status": 2} — undocumented behavior
+// the default, the API would also accept {"status": 2}, which the schema does not promise.
 static void ConfigureJson(JsonSerializerOptions options) =>
     options.Converters.Add(new JsonStringEnumConverter(namingPolicy: null, allowIntegerValues: false));
 
@@ -44,11 +45,11 @@ builder.Services.AddProblemDetails(options =>
         context.ProblemDetails.Instance =
             $"{context.HttpContext.Request.Method} {context.HttpContext.Request.Path}";
 
-        // ASP.NET Core already starts an Activity per request, so this is a real W3C
-        // traceparent today and becomes the key that stitches the HTTP request to the
-        // outbox row, the broker message and the socket push once tracing is exported.
+        // The W3C trace id of the request, which is what Jaeger searches by and what the
+        // structured logs carry as @tr — so a user quoting it from an error can be followed
+        // through the outbox row, the broker message and the socket push.
         context.ProblemDetails.Extensions["traceId"] =
-            Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
+            Activity.Current?.TraceId.ToString() ?? context.HttpContext.TraceIdentifier;
     });
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();

@@ -33,7 +33,8 @@ public sealed class RabbitMqOptions
     /// Messages the consumer rejects are routed here.
     /// </summary>
     /// <remarks>
-    /// A dead-letter exchange rather than requeueing
+    /// Dead-lettered rather than requeued: a message that fails deterministically would
+    /// otherwise loop back to the front of the queue and block everything behind it.
     /// </remarks>
     public string DeadLetterExchange { get; set; } = "order-tracking.dlx";
 

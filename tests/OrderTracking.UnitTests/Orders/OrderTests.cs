@@ -5,21 +5,21 @@ namespace OrderTracking.UnitTests.Orders;
 
 public sealed class OrderTests
 {
-    private static readonly DateTimeOffset Now = new(2026, 9, 22, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _now = new(2026, 9, 22, 12, 0, 0, TimeSpan.Zero);
 
     private static Order NewOrder(string description = "Order under test") =>
-        Order.Create("ORD-00000001", description, Now);
+        Order.Create("ORD-00000001", description, _now);
 
     [Fact]
     public void Create_starts_the_order_in_Created()
     {
-        var order = Order.Create("ORD-00000001", "Desk lamp, black", Now);
+        var order = Order.Create("ORD-00000001", "Desk lamp, black", _now);
 
         Assert.Equal("ORD-00000001", order.OrderNumber);
         Assert.Equal("Desk lamp, black", order.Description);
         Assert.Equal(OrderStatus.Created, order.Status);
-        Assert.Equal(Now, order.CreatedAt);
-        Assert.Equal(Now, order.UpdatedAt);
+        Assert.Equal(_now, order.CreatedAt);
+        Assert.Equal(_now, order.UpdatedAt);
     }
 
     [Fact]
@@ -30,7 +30,7 @@ public sealed class OrderTests
         var created = Assert.IsType<OrderCreatedEvent>(Assert.Single(order.DomainEvents));
         Assert.Equal("ORD-00000001", created.OrderNumber);
         Assert.Equal(OrderStatus.Created, created.Status);
-        Assert.Equal(Now, created.OccurredAt);
+        Assert.Equal(_now, created.OccurredAt);
         Assert.NotEqual(Guid.Empty, created.EventId);
     }
 
@@ -39,7 +39,7 @@ public sealed class OrderTests
     [InlineData("   ")]
     public void Create_rejects_a_blank_order_number(string orderNumber)
     {
-        Assert.Throws<ArgumentException>(() => Order.Create(orderNumber, "Desk lamp, black", Now));
+        Assert.Throws<ArgumentException>(() => Order.Create(orderNumber, "Desk lamp, black", _now));
     }
 
     [Theory]
@@ -47,7 +47,7 @@ public sealed class OrderTests
     [InlineData("   ")]
     public void Create_rejects_a_blank_description(string description)
     {
-        Assert.Throws<ArgumentException>(() => Order.Create("ORD-00000001", description, Now));
+        Assert.Throws<ArgumentException>(() => Order.Create("ORD-00000001", description, _now));
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public sealed class OrderTests
         var tooLong = new string('x', Order.DescriptionMaxLength + 1);
 
         var exception = Assert.Throws<ArgumentException>(
-            () => Order.Create("ORD-00000001", tooLong, Now));
+            () => Order.Create("ORD-00000001", tooLong, _now));
 
         Assert.Equal("description", exception.ParamName);
     }
@@ -67,7 +67,7 @@ public sealed class OrderTests
         // The boundary itself must be legal
         var atLimit = new string('x', Order.DescriptionMaxLength);
 
-        var order = Order.Create("ORD-00000001", atLimit, Now);
+        var order = Order.Create("ORD-00000001", atLimit, _now);
 
         Assert.Equal(atLimit, order.Description);
     }
@@ -77,14 +77,14 @@ public sealed class OrderTests
     {
         var order = NewOrder();
         order.ClearDomainEvents();
-        var later = Now.AddMinutes(30);
+        var later = _now.AddMinutes(30);
 
         var changed = order.ChangeStatus(OrderStatus.Shipped, later);
 
         Assert.True(changed);
         Assert.Equal(OrderStatus.Shipped, order.Status);
         Assert.Equal(later, order.UpdatedAt);
-        Assert.Equal(Now, order.CreatedAt);
+        Assert.Equal(_now, order.CreatedAt);
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public sealed class OrderTests
         var order = NewOrder();
         order.ClearDomainEvents();
 
-        order.ChangeStatus(OrderStatus.Shipped, Now.AddMinutes(30));
+        order.ChangeStatus(OrderStatus.Shipped, _now.AddMinutes(30));
 
         var changed = Assert.IsType<OrderStatusChangedEvent>(Assert.Single(order.DomainEvents));
         Assert.Equal(OrderStatus.Created, changed.OldStatus);
@@ -109,11 +109,11 @@ public sealed class OrderTests
         var order = NewOrder();
         order.ClearDomainEvents();
 
-        var changed = order.ChangeStatus(OrderStatus.Created, Now.AddHours(1));
+        var changed = order.ChangeStatus(OrderStatus.Created, _now.AddHours(1));
 
         Assert.False(changed);
         Assert.Equal(OrderStatus.Created, order.Status);
-        Assert.Equal(Now, order.UpdatedAt);
+        Assert.Equal(_now, order.UpdatedAt);
         Assert.Empty(order.DomainEvents);
     }
 
@@ -123,7 +123,7 @@ public sealed class OrderTests
         var order = NewOrder();
 
         var exception = Assert.Throws<InvalidOrderStatusTransitionException>(
-            () => order.ChangeStatus(OrderStatus.Delivered, Now.AddHours(1)));
+            () => order.ChangeStatus(OrderStatus.Delivered, _now.AddHours(1)));
 
         Assert.Equal(OrderStatus.Created, exception.From);
         Assert.Equal(OrderStatus.Delivered, exception.To);
@@ -136,10 +136,10 @@ public sealed class OrderTests
         order.ClearDomainEvents();
 
         Assert.Throws<InvalidOrderStatusTransitionException>(
-            () => order.ChangeStatus(OrderStatus.Delivered, Now.AddHours(1)));
+            () => order.ChangeStatus(OrderStatus.Delivered, _now.AddHours(1)));
 
         Assert.Equal(OrderStatus.Created, order.Status);
-        Assert.Equal(Now, order.UpdatedAt);
+        Assert.Equal(_now, order.UpdatedAt);
         Assert.Empty(order.DomainEvents);
     }
 
@@ -149,18 +149,18 @@ public sealed class OrderTests
         var order = NewOrder();
 
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => order.ChangeStatus((OrderStatus)999, Now.AddHours(1)));
+            () => order.ChangeStatus((OrderStatus)999, _now.AddHours(1)));
     }
 
     [Fact]
     public void A_delivered_order_cannot_be_cancelled()
     {
         var order = NewOrder();
-        order.ChangeStatus(OrderStatus.Shipped, Now.AddMinutes(10));
-        order.ChangeStatus(OrderStatus.Delivered, Now.AddMinutes(20));
+        order.ChangeStatus(OrderStatus.Shipped, _now.AddMinutes(10));
+        order.ChangeStatus(OrderStatus.Delivered, _now.AddMinutes(20));
 
         Assert.Throws<InvalidOrderStatusTransitionException>(
-            () => order.ChangeStatus(OrderStatus.Cancelled, Now.AddMinutes(30)));
+            () => order.ChangeStatus(OrderStatus.Cancelled, _now.AddMinutes(30)));
     }
 
     [Fact]
@@ -168,8 +168,8 @@ public sealed class OrderTests
     {
         var order = NewOrder();
 
-        order.ChangeStatus(OrderStatus.Shipped, Now.AddMinutes(10));
-        order.ChangeStatus(OrderStatus.Delivered, Now.AddMinutes(20));
+        order.ChangeStatus(OrderStatus.Shipped, _now.AddMinutes(10));
+        order.ChangeStatus(OrderStatus.Delivered, _now.AddMinutes(20));
 
         Assert.Equal(3, order.DomainEvents.Count);
 

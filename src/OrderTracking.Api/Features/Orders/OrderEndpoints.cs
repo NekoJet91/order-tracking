@@ -72,7 +72,7 @@ public static class OrderEndpoints
     {
         var orderNumber = await orderNumbers.NextAsync(cancellationToken);
 
-        // Trimming is normalization of untrusted input and belongs at the boundary;
+        // Trimming is normalization of untrusted input and belongs at the boundary.
         var order = Order.Create(orderNumber, request.Description.Trim(), timeProvider.GetStorableUtcNow());
 
         dbContext.Orders.Add(order);
@@ -130,8 +130,8 @@ public static class OrderEndpoints
                 || (order.CreatedAt == after.CreatedAt && order.Id < after.Id));
         }
 
-        // Projecting into a non-entity type means nothing is tracked and only these columns
-        // are selected, so AsNoTracking would be redundant here.
+        // Projected into OrderRow rather than through SelectSummary, because the next cursor
+        // needs the Id and the summary does not carry it.
         var rows = await query
             .OrderByDescending(order => order.CreatedAt)
             .ThenByDescending(order => order.Id)
@@ -243,16 +243,20 @@ public static class OrderEndpoints
         new(order.OrderNumber,
             order.Description,
             order.Status,
-            [.. OrderStatusTransitions.AllowedFrom(order.Status).OrderBy(status => status)],
+            AllowedNext(order.Status),
             order.CreatedAt,
             order.UpdatedAt);
 
+    /// <summary>The permitted next statuses in a stable order, so responses are comparable.</summary>
+    private static OrderStatus[] AllowedNext(OrderStatus from) =>
+        [.. OrderStatusTransitions.AllowedFrom(from).OrderBy(status => status)];
+
+    /// <summary>
+    /// The same list as names. Problem-details extensions are an untyped bag, so the values
+    /// are spelled out here rather than left to whichever serializer options write the body.
+    /// </summary>
     private static string[] AllowedNextNames(OrderStatus from) =>
-    [
-        .. OrderStatusTransitions.AllowedFrom(from)
-            .OrderBy(status => status)
-            .Select(status => status.ToString())
-    ];
+        [.. AllowedNext(from).Select(status => status.ToString())];
 
     /// <summary>
     /// Flat projection of the columns the list endpoint reads. Carries <c>Id</c>, which the

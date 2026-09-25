@@ -23,7 +23,7 @@ namespace OrderTracking.Api.Http;
 /// <c>500</c> in that case too.
 /// </para>
 /// </remarks>
-public sealed class GlobalExceptionHandler(
+public sealed partial class GlobalExceptionHandler(
     IProblemDetailsService problemDetailsService,
     IHostEnvironment environment,
     ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
@@ -49,13 +49,11 @@ public sealed class GlobalExceptionHandler(
 
         if (statusCode >= StatusCodes.Status500InternalServerError)
         {
-            logger.LogError(exception, "Unhandled exception for {Method} {Path}.",
-                httpContext.Request.Method, httpContext.Request.Path);
+            LogUnhandled(logger, httpContext.Request.Method, httpContext.Request.Path, exception);
         }
         else
         {
-            logger.LogWarning(exception, "Request rejected with {StatusCode} for {Method} {Path}.",
-                statusCode, httpContext.Request.Method, httpContext.Request.Path);
+            LogRejected(logger, statusCode, httpContext.Request.Method, httpContext.Request.Path, exception);
         }
 
         httpContext.Response.StatusCode = statusCode;
@@ -73,4 +71,12 @@ public sealed class GlobalExceptionHandler(
             ProblemDetails = { Status = statusCode, Title = title, Detail = detail }
         });
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception for {Method} {Path}.")]
+    private static partial void LogUnhandled(ILogger logger, string method, PathString path, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Request rejected with {StatusCode} for {Method} {Path}.")]
+    private static partial void LogRejected(
+        ILogger logger, int statusCode, string method, PathString path, Exception exception);
 }

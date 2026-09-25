@@ -38,6 +38,15 @@ csharp_style_pattern_matching_over_as_with_null_check = true:warning
 csharp_style_throw_expression = true:suggestion
 csharp_prefer_braces = true:warning
 
+# Naming: constants as PascalCase, whatever their accessibility. Listed first so it wins
+# over the private-field rule below for `private const`.
+dotnet_naming_rule.constants_pascal_case.severity = warning
+dotnet_naming_rule.constants_pascal_case.symbols = constants
+dotnet_naming_rule.constants_pascal_case.style = pascal_case
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.required_modifiers = const
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
 # Naming: private fields as _camelCase
 dotnet_naming_rule.private_fields_underscore.severity = warning
 dotnet_naming_rule.private_fields_underscore.symbols = private_fields

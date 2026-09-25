@@ -85,14 +85,14 @@ internal sealed class OrderSocketConnection : IAsyncDisposable
 
         // Whichever finishes first ends the connection: a closed socket makes sending
         // pointless, and a failed send makes listening pointless.
-        await Task.WhenAny(send, receive).ConfigureAwait(false);
+        await Task.WhenAny(send, receive);
 
-        await _closing.CancelAsync().ConfigureAwait(false);
+        await _closing.CancelAsync();
         _outbound.Writer.TryComplete();
 
         // Observed rather than abandoned, so a failure in the loop that did not win the race
         // is not left as an unobserved task exception.
-        await Task.WhenAll(Swallow(send), Swallow(receive)).ConfigureAwait(false);
+        await Task.WhenAll(Swallow(send), Swallow(receive));
     }
 
     /// <summary>Asks the connection to stop.</summary>
@@ -107,8 +107,7 @@ internal sealed class OrderSocketConnection : IAsyncDisposable
             try
             {
                 await _socket.CloseOutputAsync(
-                    WebSocketCloseStatus.NormalClosure, statusDescription: null, CancellationToken.None)
-                    .ConfigureAwait(false);
+                    WebSocketCloseStatus.NormalClosure, statusDescription: null, CancellationToken.None);
             }
 #pragma warning disable CA1031 // Closing is best effort; the client may already be gone.
             catch (Exception)
@@ -124,10 +123,9 @@ internal sealed class OrderSocketConnection : IAsyncDisposable
 
     private async Task SendLoopAsync(CancellationToken cancellationToken)
     {
-        await foreach (var frame in _outbound.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var frame in _outbound.Reader.ReadAllAsync(cancellationToken))
         {
-            await _socket.SendAsync(frame, WebSocketMessageType.Text, endOfMessage: true, cancellationToken)
-                .ConfigureAwait(false);
+            await _socket.SendAsync(frame, WebSocketMessageType.Text, endOfMessage: true, cancellationToken);
         }
     }
 
@@ -141,7 +139,7 @@ internal sealed class OrderSocketConnection : IAsyncDisposable
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var result = await _socket.ReceiveAsync(buffer, cancellationToken).ConfigureAwait(false);
+            var result = await _socket.ReceiveAsync(buffer, cancellationToken);
 
             if (result.MessageType is WebSocketMessageType.Close)
             {
@@ -154,7 +152,7 @@ internal sealed class OrderSocketConnection : IAsyncDisposable
     {
         try
         {
-            await task.ConfigureAwait(false);
+            await task;
         }
 #pragma warning disable CA1031 // The connection is ending; the reason has already been acted on.
         catch (Exception)

@@ -8,10 +8,9 @@ namespace OrderTracking.Infrastructure.Messaging;
 /// </summary>
 /// <param name="logger">Receives the events.</param>
 /// <remarks>
-/// The default handler until the WebSocket broadcaster replaces it. Keeping a real
-/// implementation registered from the start means the consumer end of the pipeline is
-/// exercised and observable now, instead of being first tried when there is also new
-/// socket code to blame.
+/// The fallback registered by the messaging layer. A host with somewhere better to send
+/// events — the API registers its WebSocket broadcaster — replaces it; any host that uses
+/// this layer without one still ends the pipeline somewhere observable rather than nowhere.
 /// </remarks>
 public sealed partial class LoggingOrderEventHandler(ILogger<LoggingOrderEventHandler> logger)
     : IOrderEventHandler

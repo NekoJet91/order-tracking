@@ -67,6 +67,25 @@ function problemOf(error: unknown): ProblemDetails {
 }
 
 /**
+ * A thunk around one API call whose rejection payload is the server's problem details.
+ *
+ * Every call here fails the same way, so the try/catch lives once, and typing `rejectValue`
+ * here is what lets the reducers read `action.payload` without a cast.
+ */
+function apiThunk<Arg, Result>(type: string, call: (arg: Arg) => Promise<Result>) {
+  return createAsyncThunk<Result, Arg, { rejectValue: ProblemDetails }>(
+    type,
+    async (arg, { rejectWithValue }) => {
+      try {
+        return await call(arg)
+      } catch (error) {
+        return rejectWithValue(problemOf(error))
+      }
+    },
+  )
+}
+
+/**
  * The key a filter's pagination is stored under.
  *
  * `null` means no filter, and needs a name of its own because an object key cannot be null.
@@ -75,59 +94,23 @@ export function filterKey(status: OrderStatus | null): string {
   return status ?? 'all'
 }
 
-export const loadOrders = createAsyncThunk(
-  'orders/load',
-  async (status: OrderStatus | null, { rejectWithValue }) => {
-    try {
-      return await fetchOrders({ status })
-    } catch (error) {
-      return rejectWithValue(problemOf(error))
-    }
-  },
+export const loadOrders = apiThunk('orders/load', (status: OrderStatus | null) =>
+  fetchOrders({ status }),
 )
 
-export const loadMoreOrders = createAsyncThunk(
+export const loadMoreOrders = apiThunk(
   'orders/loadMore',
-  async (args: { status: OrderStatus | null; cursor: string }, { rejectWithValue }) => {
-    try {
-      return await fetchOrders(args)
-    } catch (error) {
-      return rejectWithValue(problemOf(error))
-    }
-  },
+  (args: { status: OrderStatus | null; cursor: string }) => fetchOrders(args),
 )
 
-export const loadOrder = createAsyncThunk(
-  'orders/loadOne',
-  async (orderNumber: string, { rejectWithValue }) => {
-    try {
-      return await fetchOrder(orderNumber)
-    } catch (error) {
-      return rejectWithValue(problemOf(error))
-    }
-  },
-)
+export const loadOrder = apiThunk('orders/loadOne', fetchOrder)
 
-export const submitOrder = createAsyncThunk(
-  'orders/create',
-  async (description: string, { rejectWithValue }) => {
-    try {
-      return await createOrder(description)
-    } catch (error) {
-      return rejectWithValue(problemOf(error))
-    }
-  },
-)
+export const submitOrder = apiThunk('orders/create', createOrder)
 
-export const submitStatusChange = createAsyncThunk(
+export const submitStatusChange = apiThunk(
   'orders/changeStatus',
-  async (args: { orderNumber: string; status: OrderStatus }, { rejectWithValue }) => {
-    try {
-      return await changeOrderStatus(args.orderNumber, args.status)
-    } catch (error) {
-      return rejectWithValue(problemOf(error))
-    }
-  },
+  (args: { orderNumber: string; status: OrderStatus }) =>
+    changeOrderStatus(args.orderNumber, args.status),
 )
 
 /**
@@ -216,8 +199,7 @@ const ordersSlice = createSlice({
       })
       .addCase(loadOrders.rejected, (state, action) => {
         state.listStatus = 'error'
-        state.listError =
-          (action.payload as ProblemDetails | undefined)?.title ?? 'Не удалось загрузить заказы.'
+        state.listError = action.payload?.title ?? 'Не удалось загрузить заказы.'
       })
       .addCase(loadMoreOrders.fulfilled, (state, action) => {
         state.cursors[filterKey(action.meta.arg.status)] = action.payload.nextCursor
@@ -239,7 +221,7 @@ const ordersSlice = createSlice({
       })
       .addCase(submitOrder.rejected, (state, action) => {
         state.creating = false
-        state.createProblem = (action.payload as ProblemDetails | undefined) ?? null
+        state.createProblem = action.payload ?? null
       })
       .addCase(submitStatusChange.pending, (state, action) => {
         state.pendingChanges.push(action.meta.arg.orderNumber)
@@ -255,7 +237,7 @@ const ordersSlice = createSlice({
         state.pendingChanges = state.pendingChanges.filter(
           (number) => number !== action.meta.arg.orderNumber,
         )
-        state.changeProblem = (action.payload as ProblemDetails | undefined) ?? null
+        state.changeProblem = action.payload ?? null
       })
   },
 })

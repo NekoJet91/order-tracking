@@ -38,11 +38,14 @@ export const selectCreateProblem = (state: RootState) => state.orders.createProb
 export const selectChangeProblem = (state: RootState) => state.orders.changeProblem
 export const selectConnection = (state: RootState) => state.connection
 
-/** Transitions the server said were permitted, or an empty list if they are not known. */
-export const selectAllowedNext = createSelector(
-  [(state: RootState) => state.orders.allowedNext, (_: RootState, orderNumber: string) => orderNumber],
-  (allowedNext, orderNumber) => allowedNext[orderNumber] ?? [],
-)
+/**
+ * Transitions the server said were permitted, or `undefined` while they are not known.
+ *
+ * `undefined` and an empty list are different answers: the first means the details have not
+ * been read yet, the second that the order is in a terminal status.
+ */
+export const selectAllowedNext = (state: RootState, orderNumber: string) =>
+  state.orders.allowedNext[orderNumber]
 
 /** Whether a status change for this order is waiting on the server. */
 export const selectChangePending = (state: RootState, orderNumber: string) =>

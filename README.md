@@ -154,7 +154,7 @@ metrics are always on `/metrics` whether or not anything scrapes them.
 
 ```bash
 dotnet test                              # 39 unit, 43 integration
-cd client && npm test                    # 47, in jsdom
+cd client && npm test                    # 48, in jsdom
 ```
 
 Nothing to set up for either. The integration suite starts its own PostgreSQL and RabbitMQ

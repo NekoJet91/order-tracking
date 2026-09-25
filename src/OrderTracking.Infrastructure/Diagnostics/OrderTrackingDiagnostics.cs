@@ -12,7 +12,7 @@ namespace OrderTracking.Infrastructure.Diagnostics;
 /// Built on <see cref="ActivitySource"/> and <see cref="Meter"/> from the base class library,
 /// with no reference to any OpenTelemetry package. Instrumented code therefore does not know
 /// who is listening, and choosing an exporter stays a decision the host makes — see
-/// <c>Program.cs</c>, which is the only place OpenTelemetry appears.
+/// <c>ObservabilityExtensions</c> in the API project, the only place OpenTelemetry appears.
 /// </para>
 /// <para>
 /// Nothing here allocates while unobserved: an <see cref="ActivitySource"/> with no listener

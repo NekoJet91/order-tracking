@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OrderTracking.Api.Contracts.Orders;
+using OrderTracking.Api.Features.Orders;
 using OrderTracking.Infrastructure.Diagnostics;
 using OrderTracking.Infrastructure.Persistence;
 
@@ -39,14 +40,18 @@ public static class OrderSocketEndpoints
     {
         if (!context.WebSockets.IsWebSocketRequest)
         {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await context.Response.WriteAsJsonAsync(new { error = "Expected a WebSocket upgrade request." });
+            await Results.Problem(
+                    title: "Not a WebSocket request",
+                    detail: "This endpoint only accepts a WebSocket upgrade.",
+                    statusCode: StatusCodes.Status400BadRequest)
+                .ExecuteAsync(context);
             return;
         }
 
         var options = socketOptions.Value;
 
-        using var socket = await context.WebSockets.AcceptWebSocketAsync();
+        // The connection owns the socket and disposes it; no separate using is needed.
+        var socket = await context.WebSockets.AcceptWebSocketAsync();
         await using var connection = new OrderSocketConnection(socket, options.SendQueueCapacity);
 
         // Registered before the snapshot is read, not after. The other order leaves a gap in
@@ -94,16 +99,10 @@ public static class OrderSocketEndpoints
         var dbContext = scope.ServiceProvider.GetRequiredService<OrderTrackingDbContext>();
 
         var orders = await dbContext.Orders
-            .AsNoTracking()
             .OrderByDescending(order => order.CreatedAt)
             .ThenByDescending(order => order.Id)
             .Take(size)
-            .Select(order => new OrderSummaryResponse(
-                order.OrderNumber,
-                order.Description,
-                order.Status,
-                order.CreatedAt,
-                order.UpdatedAt))
+            .SelectSummary()
             .ToListAsync(cancellationToken);
 
         var counts = await OrderStatusCountReader.ReadAsync(dbContext, cancellationToken);

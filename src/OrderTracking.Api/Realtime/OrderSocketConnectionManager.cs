@@ -69,9 +69,12 @@ public sealed partial class OrderSocketConnectionManager(
     {
         ArgumentNullException.ThrowIfNull(connection);
 
-        _connections.TryRemove(connection.Id, out _);
-        OrderTrackingDiagnostics.SocketConnections(-1);
-        LogDisconnected(logger, connection.Id, _connections.Count);
+        // Guarded so a second call for the same connection cannot drive the gauge negative.
+        if (_connections.TryRemove(connection.Id, out _))
+        {
+            OrderTrackingDiagnostics.SocketConnections(-1);
+            LogDisconnected(logger, connection.Id, _connections.Count);
+        }
     }
 
     /// <summary>Sends one order to every connected client.</summary>

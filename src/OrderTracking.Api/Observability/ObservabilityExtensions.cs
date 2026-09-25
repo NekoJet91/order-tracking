@@ -5,6 +5,7 @@ using OpenTelemetry.Trace;
 using OrderTracking.Infrastructure.Diagnostics;
 using Serilog;
 using Serilog.Events;
+using Serilog.Formatting.Compact;
 
 namespace OrderTracking.Api.Observability;
 
@@ -17,7 +18,7 @@ namespace OrderTracking.Api.Observability;
 /// </remarks>
 public static class ObservabilityExtensions
 {
-    private const string _serviceName = "order-tracking-api";
+    private const string ServiceName = "order-tracking-api";
 
     /// <summary>
     /// Replaces the default logger with Serilog.
@@ -49,7 +50,7 @@ public static class ObservabilityExtensions
                 .ReadFrom.Configuration(context.Configuration)
                 .ReadFrom.Services(services)
                 .Enrich.FromLogContext()
-                .Enrich.WithProperty("service.name", _serviceName);
+                .Enrich.WithProperty("service.name", ServiceName);
 
             // No trace enricher: Serilog reads Activity.Current itself and the compact
             // formatter writes the ids as @tr and @sp. Adding them again as properties would
@@ -62,11 +63,11 @@ public static class ObservabilityExtensions
             }
             else
             {
-                configuration.WriteTo.Console(new Serilog.Formatting.Compact.CompactJsonFormatter());
+                configuration.WriteTo.Console(new CompactJsonFormatter());
             }
 
             configuration.WriteTo.File(
-                new Serilog.Formatting.Compact.CompactJsonFormatter(),
+                new CompactJsonFormatter(),
                 path: Path.Combine(AppContext.BaseDirectory, "logs", "ordertracking-.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 7,
@@ -102,7 +103,7 @@ public static class ObservabilityExtensions
         var otlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
 
         var resource = ResourceBuilder.CreateDefault()
-            .AddService(_serviceName, serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString())
+            .AddService(ServiceName, serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString())
             .AddEnvironmentVariableDetector();
 
         builder.Services.AddOpenTelemetry()
@@ -118,9 +119,7 @@ public static class ObservabilityExtensions
                         // The health probe and the scrape endpoint produce one span each, a
                         // few times a minute, forever. They would outnumber everything worth
                         // looking at.
-                        instrumentation.Filter = context =>
-                            !context.Request.Path.StartsWithSegments("/health")
-                            && !context.Request.Path.StartsWithSegments("/metrics");
+                        instrumentation.Filter = context => !IsNoise(context.Request.Path);
                     })
                     .AddHttpClientInstrumentation()
                     .AddNpgsql();

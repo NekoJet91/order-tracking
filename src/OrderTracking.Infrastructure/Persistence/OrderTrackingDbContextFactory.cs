@@ -24,17 +24,17 @@ namespace OrderTracking.Infrastructure.Persistence;
 /// </remarks>
 public sealed class OrderTrackingDbContextFactory : IDesignTimeDbContextFactory<OrderTrackingDbContext>
 {
-    private const string _connectionEnvironmentVariable = "ORDERTRACKING_MIGRATIONS_CONNECTION";
+    private const string ConnectionEnvironmentVariable = "ORDERTRACKING_MIGRATIONS_CONNECTION";
 
-    private const string _defaultDesignTimeConnection =
+    private const string DefaultDesignTimeConnection =
         "Host=localhost;Port=5432;Database=ordertracking_dev;Username=postgres";
 
     /// <inheritdoc />
     public OrderTrackingDbContext CreateDbContext(string[] args)
     {
         var connectionString =
-            Environment.GetEnvironmentVariable(_connectionEnvironmentVariable)
-            ?? _defaultDesignTimeConnection;
+            Environment.GetEnvironmentVariable(ConnectionEnvironmentVariable)
+            ?? DefaultDesignTimeConnection;
 
         var options = new DbContextOptionsBuilder<OrderTrackingDbContext>()
             .UseNpgsql(connectionString)

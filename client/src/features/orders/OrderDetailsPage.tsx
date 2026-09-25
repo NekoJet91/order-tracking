@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../../app/hooks'
-import type { RootState } from '../../app/store'
 import { ProblemMessage } from '../../components/ProblemMessage'
 import { StatusBadge } from '../../components/StatusBadge'
 import { changeProblemCleared, loadOrder, submitStatusChange } from './ordersSlice'
@@ -17,15 +16,15 @@ export function OrderDetailsPage() {
   const dispatch = useAppDispatch()
   const { orderNumber = '' } = useParams<{ orderNumber: string }>()
 
-  const order = useAppSelector((state: RootState) => selectOrder(state, orderNumber))
-  const allowedNext = useAppSelector((state: RootState) => selectAllowedNext(state, orderNumber))
-  const pending = useAppSelector((state: RootState) => selectChangePending(state, orderNumber))
+  const order = useAppSelector((state) => selectOrder(state, orderNumber))
+  const allowedNext = useAppSelector((state) => selectAllowedNext(state, orderNumber))
+  const pending = useAppSelector((state) => selectChangePending(state, orderNumber))
   const problem = useAppSelector(selectChangeProblem)
 
   // Re-reads whenever the permitted transitions are unknown, which is both the first visit
   // and the moment after a socket frame advanced the status — the frame carries the new
   // status but not what may follow it, so the reducer drops the list and this puts it back.
-  const missingTransitions = allowedNext.length === 0
+  const missingTransitions = allowedNext === undefined
 
   useEffect(() => {
     if (orderNumber && missingTransitions) {
@@ -67,7 +66,10 @@ export function OrderDetailsPage() {
           </div>
         </dl>
 
-        {allowedNext.length > 0 ? (
+        {/* Nothing is said about the transitions until the server has answered: the order
+            itself may already be in the store from the list, but whether it can still move
+            is only known once its details have been read. */}
+        {allowedNext && allowedNext.length > 0 && (
           <div className="actions">
             {allowedNext.map((status) => (
               <button
@@ -81,7 +83,9 @@ export function OrderDetailsPage() {
               </button>
             ))}
           </div>
-        ) : (
+        )}
+
+        {allowedNext && allowedNext.length === 0 && (
           <p className="muted">Заказ в конечном статусе, менять его больше нельзя.</p>
         )}
 

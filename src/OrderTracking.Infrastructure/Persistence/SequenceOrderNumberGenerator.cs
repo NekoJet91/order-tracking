@@ -17,13 +17,13 @@ namespace OrderTracking.Infrastructure.Persistence;
 internal sealed class SequenceOrderNumberGenerator(OrderTrackingDbContext dbContext)
     : IOrderNumberGenerator
 {
-    private const string _nextValueSql = $"""SELECT nextval('{OrderTrackingDbContext.OrderNumberSequenceName}') AS "Value" """;
+    private const string NextValueSql = $"""SELECT nextval('{OrderTrackingDbContext.OrderNumberSequenceName}') AS "Value" """;
 
     /// <inheritdoc />
     public async Task<string> NextAsync(CancellationToken cancellationToken = default)
     {
         var next = await dbContext.Database
-            .SqlQueryRaw<long>(_nextValueSql)
+            .SqlQueryRaw<long>(NextValueSql)
             .SingleAsync(cancellationToken)
             .ConfigureAwait(false);
 

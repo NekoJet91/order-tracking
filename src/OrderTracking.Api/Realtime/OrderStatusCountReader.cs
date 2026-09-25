@@ -33,29 +33,11 @@ internal static class OrderStatusCountReader
         ArgumentNullException.ThrowIfNull(dbContext);
 
         var counted = await dbContext.Orders
-            .AsNoTracking()
             .GroupBy(order => order.Status)
             .Select(group => new { Status = group.Key, Count = group.Count() })
-            .ToDictionaryAsync(row => row.Status, row => row.Count, cancellationToken)
-            .ConfigureAwait(false);
+            .ToDictionaryAsync(row => row.Status, row => row.Count, cancellationToken);
 
         return Enum.GetValues<OrderStatus>()
             .ToDictionary(status => status.ToString(), counted.GetValueOrDefault);
-    }
-
-    /// <summary>Reads the current per-status totals in a scope of its own.</summary>
-    /// <param name="scopeFactory">Supplies the scope the context is resolved from.</param>
-    /// <param name="cancellationToken">Cancels the read.</param>
-    /// <returns>Every status, including those with no orders.</returns>
-    public static async Task<IReadOnlyDictionary<string, int>> ReadAsync(
-        IServiceScopeFactory scopeFactory,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(scopeFactory);
-
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<OrderTrackingDbContext>();
-
-        return await ReadAsync(dbContext, cancellationToken).ConfigureAwait(false);
     }
 }

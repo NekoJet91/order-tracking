@@ -41,7 +41,6 @@ public sealed class RabbitMqEventPublisher(
     {
         ArgumentNullException.ThrowIfNull(message);
 
-        var channel = await GetChannelAsync(cancellationToken).ConfigureAwait(false);
         var routingKey = RabbitMqTopology.RoutingKeyFor(message.Type);
 
         // Parented by the request that wrote the row, not by the sweep that found it. The
@@ -78,10 +77,13 @@ public sealed class RabbitMqEventPublisher(
             };
         }
 
+        // The channel is resolved inside the gate as well, so two concurrent callers cannot
+        // both find it closed and each open one of their own.
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            //Doesn't return until the broker processed the message properly
+            var channel = await GetChannelAsync(cancellationToken).ConfigureAwait(false);
+
             await channel.BasicPublishAsync(
                 exchange: _options.Exchange,
                 routingKey: routingKey,

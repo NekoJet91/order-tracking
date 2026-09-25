@@ -93,7 +93,8 @@ describe('the version guard', () => {
       }),
     )
 
-    expect(selectAllowedNext(store.getState(), 'ORD-00000001')).toEqual([])
+    // Unknown, not empty: an empty list would say the order is finished.
+    expect(selectAllowedNext(store.getState(), 'ORD-00000001')).toBeUndefined()
   })
 
   it('keeps the permitted transitions when a frame repeats the same version', () => {

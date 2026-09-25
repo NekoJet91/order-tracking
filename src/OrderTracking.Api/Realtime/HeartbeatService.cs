@@ -23,7 +23,7 @@ public sealed class HeartbeatService(
     {
         using var timer = new PeriodicTimer(options.Value.HeartbeatInterval, timeProvider);
 
-        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
+        while (await timer.WaitForNextTickAsync(stoppingToken))
         {
             if (connections.Count > 0)
             {

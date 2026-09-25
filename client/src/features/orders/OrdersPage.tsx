@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../../app/hooks'
-import type { RootState } from '../../app/store'
 import { OrderStatus } from '../../api/types'
 import { ProblemMessage } from '../../components/ProblemMessage'
 import { StatusBadge } from '../../components/StatusBadge'
@@ -29,9 +28,9 @@ export function OrdersPage() {
   const dispatch = useAppDispatch()
   const [filter, setFilter] = useState<OrderStatus | null>(null)
 
-  const visible = useAppSelector((state: RootState) => selectVisibleOrders(state, filter))
-  const nextCursor = useAppSelector((state: RootState) => selectNextCursor(state, filter))
-  const loaded = useAppSelector((state: RootState) => selectFilterLoaded(state, filter))
+  const visible = useAppSelector((state) => selectVisibleOrders(state, filter))
+  const nextCursor = useAppSelector((state) => selectNextCursor(state, filter))
+  const loaded = useAppSelector((state) => selectFilterLoaded(state, filter))
   const listStatus = useAppSelector(selectListStatus)
   const listError = useAppSelector(selectListError)
   const counts = useAppSelector(selectStatusCounts)

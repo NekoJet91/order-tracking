@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { Provider } from 'react-redux'
@@ -104,6 +104,34 @@ describe('the details page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Переход между статусами недопустим.',
     )
+  })
+
+  it('does not call an order finished before its transitions have been read', async () => {
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    server.use(
+      http.get('/api/orders/ORD-00000001', async () => {
+        await held
+        return HttpResponse.json(orderDetails({ allowedNextStatuses: [OrderStatus.Shipped] }))
+      }),
+    )
+
+    // The order is already in the store from the list, so the page renders it at once —
+    // but nothing is known yet about what it may become.
+    const store = renderPage()
+    act(() => {
+      store.dispatch(orderPushed({ order: anOrder(), counts: counts({ Created: 1 }) }))
+    })
+
+    expect(await screen.findByRole('heading', { name: 'ORD-00000001' })).toBeInTheDocument()
+    expect(screen.queryByText(/в конечном статусе/)).not.toBeInTheDocument()
+
+    release()
+
+    expect(await screen.findByRole('button', { name: 'Отправить' })).toBeInTheDocument()
   })
 
   it('says a finished order is finished instead of showing no buttons', async () => {

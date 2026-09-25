@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using OrderTracking.Api.Contracts.Orders;
+using OrderTracking.Api.Features.Orders;
 using OrderTracking.Infrastructure.Diagnostics;
 using OrderTracking.Infrastructure.Messaging;
 using OrderTracking.Infrastructure.Persistence;
@@ -48,29 +48,18 @@ public sealed partial class WebSocketOrderEventHandler(
         activity?.SetTag("ordertracking.socket.clients", connections.Count);
 
         var order = await dbContext.Orders
-            .AsNoTracking()
             .Where(candidate => candidate.OrderNumber == notification.OrderNumber)
-            .Select(candidate => new OrderSummaryResponse(
-                candidate.OrderNumber,
-                candidate.Description,
-                candidate.Status,
-                candidate.CreatedAt,
-                candidate.UpdatedAt))
-            .SingleOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
+            .SelectSummary()
+            .SingleOrDefaultAsync(cancellationToken);
 
         if (order is null)
         {
-            // Possible in principle — an event outlives the row it describes
+            // Possible in principle: an event can outlive the row it describes.
             LogMissingOrder(logger, notification.OrderNumber, notification.EventId);
             return;
         }
 
-        // Read after the order and in the same scope, so the totals describe the same state
-        // the frame does. A second query per event is the price of the client never having
-        // to work the numbers out from a page it only partly holds.
-        var counts = await OrderStatusCountReader.ReadAsync(dbContext, cancellationToken)
-            .ConfigureAwait(false);
+        var counts = await OrderStatusCountReader.ReadAsync(dbContext, cancellationToken);
 
         connections.Broadcast(order, counts);
     }

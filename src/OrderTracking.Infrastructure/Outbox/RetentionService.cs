@@ -37,26 +37,19 @@ public sealed partial class RetentionService(
             return;
         }
 
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            // Waits first. Startup is the busiest moment a process has, and nothing here is
-            // urgent enough to compete with it.
-            try
-            {
-                await Task.Delay(_options.Interval, timeProvider, stoppingToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
+        // The timer waits a full interval before the first tick. Startup is the busiest moment
+        // a process has, and nothing here is urgent enough to compete with it.
+        using var timer = new PeriodicTimer(_options.Interval, timeProvider);
 
+        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
+        {
             try
             {
                 await SweepAsync(stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                break;
+                return;
             }
 #pragma warning disable CA1031 // Housekeeping must never take the application down.
             catch (Exception exception)

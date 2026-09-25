@@ -9,7 +9,7 @@ namespace OrderTracking.Domain.Orders;
 /// </remarks>
 public static class OrderStatusTransitions
 {
-    private static readonly IReadOnlyDictionary<OrderStatus, IReadOnlySet<OrderStatus>> AllowedTransitions =
+    private static readonly IReadOnlyDictionary<OrderStatus, IReadOnlySet<OrderStatus>> _allowedTransitions =
         new Dictionary<OrderStatus, IReadOnlySet<OrderStatus>>
         {
             [OrderStatus.Created] = new HashSet<OrderStatus> { OrderStatus.Shipped, OrderStatus.Cancelled },
@@ -28,7 +28,7 @@ public static class OrderStatusTransitions
     /// <paramref name="from"/> is not a defined <see cref="OrderStatus"/>.
     /// </exception>
     public static IReadOnlySet<OrderStatus> AllowedFrom(OrderStatus from) =>
-        AllowedTransitions.TryGetValue(from, out var next)
+        _allowedTransitions.TryGetValue(from, out var next)
             ? next
             : throw new ArgumentOutOfRangeException(nameof(from), from, "Not a defined order status.");
 

@@ -1,3 +1,4 @@
+using OrderTracking.Domain.Orders.Events;
 using RabbitMQ.Client;
 
 namespace OrderTracking.Infrastructure.Messaging;
@@ -86,44 +87,23 @@ internal static class RabbitMqTopology
     }
 
     /// <summary>
-    /// Maps a domain event type name to its routing key, for example
-    /// <c>OrderStatusChangedEvent</c> to <c>order.status-changed</c>.
+    /// Maps a domain event type name to its routing key.
     /// </summary>
     /// <param name="eventType">The event type name stored on the outbox row.</param>
-    /// <returns>A dotted, lower-case routing key.</returns>
-    public static string RoutingKeyFor(string eventType)
+    /// <returns>A dotted, lower-case routing key under <see cref="RoutingKeyPrefix"/>.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="eventType"/> is not an event this topology knows how to route.
+    /// </exception>
+    /// <remarks>
+    /// An explicit table rather than a derivation from the type name. The consumer's
+    /// deserializer is a matching table, so a new event type has to be added in both places
+    /// anyway — and a name that is not in the table is a bug, which should fail here rather
+    /// than be published under a key nothing is bound to.
+    /// </remarks>
+    public static string RoutingKeyFor(string eventType) => eventType switch
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
-
-        var name = eventType;
-
-        if (name.StartsWith("Order", StringComparison.Ordinal))
-        {
-            name = name["Order".Length..];
-        }
-
-        if (name.EndsWith("Event", StringComparison.Ordinal))
-        {
-            name = name[..^"Event".Length];
-        }
-
-        return $"{RoutingKeyPrefix}.{ToKebabCase(name)}";
-    }
-
-    private static string ToKebabCase(string value)
-    {
-        var builder = new System.Text.StringBuilder(value.Length + 4);
-
-        foreach (var character in value)
-        {
-            if (char.IsUpper(character) && builder.Length > 0)
-            {
-                builder.Append('-');
-            }
-
-            builder.Append(char.ToLowerInvariant(character));
-        }
-
-        return builder.ToString();
-    }
+        nameof(OrderCreatedEvent) => $"{RoutingKeyPrefix}.created",
+        nameof(OrderStatusChangedEvent) => $"{RoutingKeyPrefix}.status-changed",
+        _ => throw new ArgumentOutOfRangeException(nameof(eventType), eventType, "Not a routable event type.")
+    };
 }

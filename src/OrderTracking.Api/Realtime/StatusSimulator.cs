@@ -52,11 +52,11 @@ public sealed partial class StatusSimulator(
     {
         using var timer = new PeriodicTimer(_options.Interval, timeProvider);
 
-        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
+        while (await timer.WaitForNextTickAsync(stoppingToken))
         {
             try
             {
-                await StepAsync(stoppingToken).ConfigureAwait(false);
+                await StepAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -80,25 +80,24 @@ public sealed partial class StatusSimulator(
             .Where(order => order.Status == OrderStatus.Created || order.Status == OrderStatus.Shipped)
             .OrderBy(order => order.UpdatedAt)
             .Take(_options.MaxOpenOrders)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
+            .ToListAsync(cancellationToken);
 
         // Advance the order that has been waiting longest, unless there is room for another
         // one — which keeps the screen showing both new arrivals and progress.
         if (open.Count >= _options.MaxOpenOrders || (open.Count > 0 && Random.Shared.Next(3) != 0))
         {
-            await AdvanceAsync(dbContext, open[0], cancellationToken).ConfigureAwait(false);
+            await AdvanceAsync(dbContext, open[0], cancellationToken);
             return;
         }
 
-        await CreateAsync(scope, dbContext, cancellationToken).ConfigureAwait(false);
+        await CreateAsync(scope, dbContext, cancellationToken);
     }
 
     private async Task CreateAsync(
         AsyncServiceScope scope, OrderTrackingDbContext dbContext, CancellationToken cancellationToken)
     {
         var generator = scope.ServiceProvider.GetRequiredService<IOrderNumberGenerator>();
-        var orderNumber = await generator.NextAsync(cancellationToken).ConfigureAwait(false);
+        var orderNumber = await generator.NextAsync(cancellationToken);
 
         var order = Order.Create(
             orderNumber,
@@ -106,7 +105,7 @@ public sealed partial class StatusSimulator(
             timeProvider.GetStorableUtcNow());
 
         dbContext.Orders.Add(order);
-        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         LogCreated(logger, orderNumber);
     }
@@ -114,22 +113,22 @@ public sealed partial class StatusSimulator(
     private async Task AdvanceAsync(
         OrderTrackingDbContext dbContext, Order order, CancellationToken cancellationToken)
     {
-        var allowed = OrderStatusTransitions.AllowedFrom(order.Status).ToArray();
+        var allowed = OrderStatusTransitions.AllowedFrom(order.Status);
 
-        if (allowed.Length == 0)
+        if (allowed.Count == 0)
         {
             return;
         }
 
         // Cancellation is possible but rare, so the happy path is what a viewer mostly sees
         // while the unhappy one still shows up often enough to be worth rendering.
-        var next = allowed.Length > 1 && Random.Shared.Next(6) == 0
-            ? allowed[^1]
-            : allowed[0];
+        var next = allowed.Contains(OrderStatus.Cancelled) && Random.Shared.Next(6) == 0
+            ? OrderStatus.Cancelled
+            : allowed.FirstOrDefault(status => status != OrderStatus.Cancelled, OrderStatus.Cancelled);
 
         var from = order.Status;
         order.ChangeStatus(next, timeProvider.GetStorableUtcNow());
-        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         LogAdvanced(logger, order.OrderNumber, from, next);
     }
