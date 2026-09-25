@@ -1,0 +1,56 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml,md,ts,tsx,js,jsx,css,html}]
+indent_size = 2
+
+[*.{csproj,props,targets,config}]
+indent_size = 2
+
+[*.cs]
+# Usings
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = outside_namespace:warning
+
+# File-scoped namespaces: one less level of indentation, and the modern default.
+csharp_style_namespace_declarations = file_scoped:warning
+
+# Expression-bodied members where they genuinely read better
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+
+# `var` only when the type is obvious from the right-hand side
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+
+# Modern language features
+csharp_style_prefer_primary_constructors = true:suggestion
+csharp_style_pattern_matching_over_is_with_cast_check = true:warning
+csharp_style_pattern_matching_over_as_with_null_check = true:warning
+csharp_style_throw_expression = true:suggestion
+csharp_prefer_braces = true:warning
+
+# Naming: private fields as _camelCase
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_prefix
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_prefix.required_prefix = _
+dotnet_naming_style.underscore_prefix.capitalization = camel_case
+
+# ConfigureAwait: irrelevant in ASP.NET Core application code (no SynchronizationContext
+# to capture), so don't let the analyzer demand it everywhere.
+dotnet_diagnostic.CA2007.severity = none
+
+[tests/**/*.cs]
+# Test method names are intentionally long and descriptive.
+dotnet_diagnostic.CA1707.severity = none

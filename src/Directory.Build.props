@@ -1,0 +1,15 @@
+<Project>
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <!--
+      The brief asks for XML documentation on classes, methods and properties. Combined
+      with TreatWarningsAsErrors this makes CS1591 (missing comment on a public member)
+      a build error, so the documentation requirement enforces itself instead of being
+      a final-day chore. It also feeds Swagger, so the same comments serve twice.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

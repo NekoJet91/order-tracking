@@ -1,0 +1,28 @@
+<Project>
+
+  <!--
+    Settings shared by every project in the solution. Per-tree overrides live in
+    src/Directory.Build.props and tests/Directory.Build.props, which import this file.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!--
+      Compiler warnings are errors from the first commit; retrofitting this never happens.
+      This is what makes CS1591 (missing XML comment) enforce the documentation requirement.
+
+      Deliberately NOT enabling EnforceCodeStyleInBuild or AnalysisMode=Recommended:
+      combined with TreatWarningsAsErrors they turn style preferences and rules like
+      CA1062/CA1031/CA1848 into build failures, which costs more time than it saves on a
+      two-day project. The IDE still surfaces them from .editorconfig.
+    -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest</AnalysisLevel>
+
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+</Project>

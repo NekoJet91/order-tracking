@@ -1,0 +1,425 @@
+/*
+ * One stylesheet, no UI kit.
+ *
+ * The palette lives in custom properties and each status gets one accent, which is what
+ * lets components carry a `data-status` attribute and say nothing about colour. Dark mode
+ * is a second block of the same properties rather than a parallel set of rules.
+ */
+
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #e3e6ea;
+  --text: #16191d;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --danger: #b91c1c;
+  --danger-bg: #fef2f2;
+
+  --status-Created: #2563eb;
+  --status-Shipped: #b45309;
+  --status-Delivered: #15803d;
+  --status-Cancelled: #9ca3af;
+
+  --radius: 10px;
+  --gap: 16px;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --surface: #1b1e23;
+    --border: #2b3038;
+    --text: #e7e9ec;
+    --muted: #9aa3af;
+    --accent: #60a5fa;
+    --danger: #fca5a5;
+    --danger-bg: #2a1a1a;
+
+    --status-Created: #60a5fa;
+    --status-Shipped: #fbbf24;
+    --status-Delivered: #4ade80;
+    --status-Cancelled: #6b7280;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  max-width: 840px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+/* Header ------------------------------------------------------------------ */
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-size: 18px;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+}
+
+.connection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.connection .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+
+.connection[data-status='open'] .dot {
+  background: var(--status-Delivered);
+}
+
+.connection[data-status='connecting'] .dot,
+.connection[data-status='reconnecting'] .dot {
+  background: var(--status-Shipped);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.connection[data-status='offline'] .dot {
+  background: var(--danger);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* Cards ------------------------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.create-form label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.create-row {
+  display: flex;
+  gap: 10px;
+}
+
+input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+}
+
+input:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Buttons ----------------------------------------------------------------- */
+
+button {
+  padding: 9px 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.ghost {
+  background: none;
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+/* Scoped to the detail page's action row on purpose. Unscoped, this also matched the
+   Cancelled filter chip — which is a button carrying the same attribute — and beat `.chip`
+   on specificity, so the chip read red when off and grey when on. */
+.actions button[data-status='Cancelled'] {
+  background: none;
+  border-color: var(--border);
+  color: var(--danger);
+}
+
+.more {
+  width: 100%;
+  margin-top: 12px;
+}
+
+/* Filters ----------------------------------------------------------------- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.chip {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Selection is carried by the border, a tint and the weight — not by colour alone. Colour
+   cannot do it: Cancelled's palette entry is a deliberately muted grey, so switching to it
+   makes the label fainter than the unselected ones rather than stronger. */
+.chip[aria-pressed='true'] {
+  border-color: currentcolor;
+  color: var(--text);
+  background: color-mix(in srgb, currentcolor 10%, var(--surface));
+  font-weight: 600;
+}
+
+.chip[data-status][aria-pressed='true'] {
+  color: var(--status);
+}
+
+.chip[data-status='Created'] { --status: var(--status-Created); }
+.chip[data-status='Shipped'] { --status: var(--status-Shipped); }
+.chip[data-status='Delivered'] { --status: var(--status-Delivered); }
+.chip[data-status='Cancelled'] { --status: var(--status-Cancelled); }
+
+.chip .count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
+
+/* Order list -------------------------------------------------------------- */
+
+.orders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.order-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.order-main {
+  min-width: 0;
+}
+
+.order-number {
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.order-number:hover {
+  color: var(--accent);
+}
+
+.order-description {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-row time {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .order-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .order-row time {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Badge ------------------------------------------------------------------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid currentcolor;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+.badge[data-status='Created'] { color: var(--status-Created); }
+.badge[data-status='Shipped'] { color: var(--status-Shipped); }
+.badge[data-status='Delivered'] { color: var(--status-Delivered); }
+.badge[data-status='Cancelled'] { color: var(--status-Cancelled); }
+
+/* Details ----------------------------------------------------------------- */
+
+.back {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.details header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+}
+
+.details h2 {
+  margin: 0;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.details dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 18px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.details dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.details dd {
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* Messages ---------------------------------------------------------------- */
+
+.problem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.problem-body {
+  flex: 1;
+}
+
+.problem p,
+.problem ul {
+  margin: 6px 0 0;
+}
+
+.problem ul {
+  padding-left: 18px;
+}
+
+.problem button {
+  padding: 0 6px;
+  font-size: 18px;
+  line-height: 1.2;
+  border-color: transparent;
+  color: inherit;
+}
+
+.field-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.muted {
+  color: var(--muted);
+}

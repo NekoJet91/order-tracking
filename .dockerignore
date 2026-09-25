@@ -1,0 +1,22 @@
+# Everything the build does not need. Beyond context size, bin/ and obj/ from a host build
+# carry absolute paths and a host runtime identifier, and shadow what the container restore
+# produced.
+
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.user
+
+.git/
+.gitignore
+**/*.md
+client/
+
+# Never in a layer, even a discarded one.
+**/appsettings.*.local.json
+**/*.env
+.env

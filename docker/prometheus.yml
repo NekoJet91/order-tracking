@@ -1,0 +1,12 @@
+# Scrapes the API's /metrics endpoint. Nothing else is scraped: Postgres and RabbitMQ both
+# have exporters worth running in a real deployment, but neither adds anything to a test task
+# whose point is the application's own numbers.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: order-tracking-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8080"]

@@ -1,0 +1,9 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Deliberately empty. Common properties come from ../Directory.Build.props, and the
+    absence of any PackageReference or ProjectReference is the point: the domain layer
+    depends on nothing, so the layering is a fact rather than a claim.
+  -->
+
+</Project>

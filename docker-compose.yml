@@ -1,0 +1,150 @@
+# The whole system, from a clean clone: `docker compose up --build`.
+#
+# Five ports reach the host: the client, the API, the RabbitMQ management UI, Jaeger and
+# Prometheus. Postgres and the AMQP port are not published — the containers reach each other
+# by service name, and a developer machine is likely to have its own server on any port worth
+# guessing. Go through the container instead:
+#
+#   docker compose exec postgres psql -U ordertracking -d ordertracking
+#   docker compose exec rabbitmq  rabbitmqctl list_queues
+#
+# Every port and every credential is overridable. Copy .env.example to .env and compose picks
+# it up without being told.
+
+name: order-tracking
+
+# One definition for three consumers, so they cannot drift apart.
+x-postgres-connection: &postgres-connection >-
+  Host=postgres;Port=5432;Database=${POSTGRES_DB:-ordertracking};Username=${POSTGRES_USER:-ordertracking};Password=${POSTGRES_PASSWORD:-ordertracking}
+
+services:
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ordertracking}
+      POSTGRES_USER: ${POSTGRES_USER:-ordertracking}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ordertracking}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # Postgres accepts connections some seconds after the process exists, so the migrator
+      # has to wait for readiness rather than for the container to be up.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ordertracking} -d ${POSTGRES_DB:-ordertracking}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-ordertracking}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-ordertracking}
+    ports:
+      # Management UI only, with the credentials above. The notifications queue and its
+      # dead-letter companion are visible there, with their depths moving as orders change.
+      - "${RABBITMQ_MANAGEMENT_PORT:-15673}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      # The broker takes a while to boot and the API's connection attempt is not patient.
+      start_period: 20s
+
+  # Runs to completion and exits. Applying migrations is a deployment step with its own
+  # outcome; doing it from the application would have two API replicas racing to apply the
+  # same migration.
+  migrator:
+    build:
+      context: .
+      target: migrator
+    environment:
+      ORDERTRACKING_MIGRATIONS_CONNECTION: *postgres-connection
+      # Also under the application's own key. The bundle tries to build the startup project's
+      # host before falling back to the design-time factory, and without this it logs that
+      # first attempt as an error — making a successful migration read like a broken one.
+      ConnectionStrings__OrderTracking: *postgres-connection
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      target: api
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__OrderTracking: *postgres-connection
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__UserName: ${RABBITMQ_USER:-ordertracking}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-ordertracking}
+      # Spans go to Jaeger over OTLP. Metrics do not: Prometheus scrapes them off /metrics.
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      # Off by default. Set to true for a walkthrough and orders create and advance by
+      # themselves, which is the quickest way to see the socket do something.
+      StatusSimulator__Enabled: ${SIMULATOR:-false}
+    ports:
+      - "${API_PORT:-5138}:8080"
+    volumes:
+      # Keeps the rolling log across restarts, which is most of the reason a file sink exists.
+      - api-logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+      jaeger:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+
+  # All-in-one: collector, storage and UI in one container, storing spans in memory. Fine for
+  # a demonstration, and nothing a deployment would keep — restarting it loses every trace.
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      # The UI. The OTLP ports stay inside the network; only the API talks to them.
+      - "${JAEGER_UI_PORT:-16686}:16686"
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      # Shorter than the default fifteen days, because nothing here is worth a large volume.
+      - --storage.tsdb.retention.time=24h
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ./client
+    ports:
+      - "${CLIENT_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
+  prometheus-data:
+  api-logs:

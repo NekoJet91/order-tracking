@@ -1,0 +1,7 @@
+# node_modules is installed in the image from the lockfile; the host's would carry binaries
+# built for the host's platform and libc.
+node_modules/
+dist/
+.vite/
+*.log
+coverage/
