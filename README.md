@@ -108,18 +108,13 @@ threads.
 Change a status, then open Jaeger at <http://localhost:16686>, pick `order-tracking-api` and
 the `PATCH /api/orders/{orderNumber}/status` operation. One trace, ten spans:
 
-```
-PATCH /api/orders/{orderNumber}/status                18.6ms
-  ordertracking  [SELECT o.id, o.created_at, ...]      1.8ms
-  ordertracking  [UPDATE orders SET status = @p0...]   0.8ms
-  order.status-changed publish                         1.6ms
-    order.status-changed process                      12.6ms
-      ordertracking  [SELECT EXISTS (...processed...)]  1.0ms
-      socket broadcast                                 3.3ms
-        ordertracking  [SELECT o.order_number, ...]     0.6ms
-        ordertracking  [SELECT o.status, count(*)...]   1.8ms
-      ordertracking  [INSERT INTO processed_messages]   0.7ms
-```
+![One trace spanning the HTTP request, the outbox publish, the RabbitMQ consumer and the socket broadcast](docs/jaeger-trace.png)
+
+Reading down the tree: the request, the two statements that change the row, the publish, the
+consumer, the deduplication check, the broadcast with the two reads behind it, and the marker
+insert. Most of the 635 ms is the outbox poller's one-second interval — the event is committed
+immediately and picked up on the next sweep, which is the latency the polling design buys and
+the trace makes visible rather than hiding.
 
 That tree is only possible because the trace context survives two handovers. The interceptor
 writes the current `traceparent` onto the outbox row inside the same transaction as the order;
